@@ -44,7 +44,6 @@ const MODULE_MAP: Record<string, string> = {
   config:        "../src/commands/ops",
   summary:       "../src/commands/ops",
   standards:     "../src/commands/ops",
-  build:         "../src/commands/ops",
   deploy:        "../src/commands/ops",
   migrate:       "../src/commands/ops",
   process:       "../src/commands/ops",
