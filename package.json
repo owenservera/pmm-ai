@@ -13,7 +13,7 @@
     "swarm", "multi-agent", "opencode", "gemini-cli", "kilocode"
   ],
   "bin": {
-    "pmm-ai": "./bin/pmm.ts"
+    "pmm-ai": "./bin/pmm.js"
   },
   "files": [
     "bin/",
