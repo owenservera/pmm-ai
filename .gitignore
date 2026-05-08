@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+bun.lock
+
+# Runtime data (auto-created)
+data/pmm.db
+data/*.bak
+data/*.db-shm
+data/*.db-wal
+
+# Session state (runtime)
+state/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+dist/
+*.tsbuildinfo

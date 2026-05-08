@@ -1,0 +1,470 @@
+/**
+ * PMM Execution Framework -- Adapter Generator
+ *
+ * Given a full harness profile from the registry, generates:
+ * 1. A complete adapter .ts file implementing ExecutionRuntime
+ * 2. PMM delegation instruction block to append to the harness's instruction file
+ *
+ * Usage:
+ *   const profile = registry.harnesses["opencode"] as HarnessProfile;
+ *   const source = generateAdapter(profile);        // returns .ts source
+ *   const block  = generateInstructionBlock(profile); // returns markdown
+ *   const result = injectHarness(profile, { outputDir: "/path/to/harness" });
+ */
+
+import * as fs from "node:fs";
+import * as path from "node:path";
+import type { HarnessProfile } from "./harnesses/discover";
+
+// ── Types ───────────────────────────────────────────────────────────────────
+
+export interface InjectResult {
+  adapterPath: string;
+  instructionPath: string | null;
+  dryRun: boolean;
+  filesWritten: string[];
+}
+
+// ── String Helpers ──────────────────────────────────────────────────────────
+
+/** Known terminal suffixes that should be split into their own word in PascalCase. */
+const KNOWN_SUFFIXES = ["code", "cli", "ide"];
+
+/**
+ * Find the index at which a known suffix starts, or -1 if none found.
+ * Ensures the word is long enough that the split is meaningful
+ * (e.g., "code" itself is not split further).
+ */
+function findSuffixSplit(word: string): number {
+  for (const suffix of KNOWN_SUFFIXES) {
+    if (word.endsWith(suffix) && word.length > suffix.length + 1) {
+      return word.length - suffix.length;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Convert a kebab-case, snake_case, or compound-lowercase key to PascalCase.
+ *
+ * Splits on hyphens, underscores, camelCase transitions, and known terminal
+ * suffixes ("code", "cli", "ide") for proper branding capitalization.
+ *
+ * Examples:
+ *   "claude-code"  → "ClaudeCode"
+ *   "opencode"     → "OpenCode"
+ *   "kilocode"     → "KiloCode"
+ *   "gemini-cli"   → "GeminiCli"
+ *   "antigravity"  → "Antigravity"
+ */
+function toPascalCase(key: string): string {
+  const words: string[] = [];
+
+  // 1. Split on hyphens and underscores
+  for (const part of key.split(/[-_]/)) {
+    // 2. Split on camelCase transitions (lowercase → uppercase)
+    const segments = part.split(/(?<=[a-z])(?=[A-Z])/);
+
+    for (const seg of segments) {
+      const lower = seg.toLowerCase();
+      // 3. Try to split known terminal suffixes
+      const splitAt = findSuffixSplit(lower);
+      if (splitAt > 0) {
+        words.push(lower.slice(0, splitAt));
+        words.push(lower.slice(splitAt));
+      } else {
+        words.push(lower);
+      }
+    }
+  }
+
+  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join("");
+}
+
+/**
+ * Build the HTML comment line for a lifecycle method based on hook_events mapping.
+ *
+ * Mapping rules:
+ *   hook_events[0] → onSessionStart
+ *   hook_events[1] → onSessionEnd
+ *   hook_events[2] → onPreToolUse (if available)
+ *   hook_events[3] → onPostToolUse (if available)
+ *   hook_events[4] → onUserPromptSubmit (if available)
+ */
+function lifecycleComment(hookMechanism: string, hookEvents: string[], index: number): string {
+  if (index < hookEvents.length) {
+    return `/* ${hookMechanism} → ${hookEvents[index]} */`;
+  }
+  return "/* Not mapped — no corresponding hook event */";
+}
+
+// ── Adapter Source Generation ───────────────────────────────────────────────
+
+/**
+ * Generate the complete TypeScript source for a harness adapter.
+ *
+ * The output follows the same structural pattern as ClaudeCodeAdapter
+ * (see adapters/claude-code.ts) with harness-specific substitutions.
+ *
+ * @param profile     Full harness profile from the registry
+ * @param harnessKey  The registry key for this harness (derived from adapter_file if omitted)
+ */
+export function generateAdapter(
+  profile: HarnessProfile,
+  harnessKey: string = getKeyFromProfile(profile),
+): string {
+  const className = toPascalCase(harnessKey);
+  const today = new Date().toISOString().split("T")[0];
+
+  // Shared import block
+  const imports = `import type {
+  ExecutionRuntime, AgentSpawner, AgentHandle, WorkerResult,
+  SkillInvoker, SkillResult, CommandRunner, CommandResult,
+  LifecycleManager, SpawnAgentParams, InvokeSkillParams, ExecCommandParams
+} from "../contract";
+import { buildWorkerPrompt, injectWorkerTracking } from "./claude-code";`;
+
+  // Decorative summary block (between imports and JSDoc)
+  const summary = `// ══ ${profile.name} Adapter ═══════════════════════════════════════════
+// Agent spawn:   ${profile.agent_spawn}(...)
+// Skill invoke:  ${profile.skill_invoke}(...)
+// Command run:   ${profile.command_run}(...)
+// File read:     ${profile.file_read}(...)
+// File write:    ${profile.file_write}(...)
+// Hook mechanism: ${profile.hook_mechanism}
+// Hook events:   ${profile.hook_events.join(", ")}
+// Instruction:   ${profile.instruction_file}`;
+
+  // JSDoc header block
+  const header = `/**
+ * ${profile.name} Adapter — Maps the PMM Execution Contract to ${profile.name} primitives.
+ *
+ * Generated by: bun scripts/pmm.ts exec inject --harness ${harnessKey}
+ * Harness: ${profile.name} (${profile.status})
+ * Generated: ${today}
+ *
+ * Adapter maps PMM Execution Contract to ${profile.name} native primitives.
+ *
+ * Contract Method          → ${profile.name} Primitive
+ * ─────────────────────────────────────────────────
+ * agents.spawn()          → ${profile.agent_spawn}()
+ * skills.invoke()         → ${profile.skill_invoke}()
+ * commands.exec()         → ${profile.command_run}()
+ * lifecycle.onSession*()  → ${profile.hook_mechanism}
+ */
+
+/**
+ * ${className}Adapter — maps the PMM Execution Contract to ${profile.name} primitives.
+ *
+ * Contract Method          → ${profile.name} Primitive
+ * ─────────────────────────────────────────────────
+ * agents.spawn()          → ${profile.agent_spawn}()
+ * skills.invoke()         → ${profile.skill_invoke}()
+ * commands.exec()         → ${profile.command_run}()
+ * lifecycle.onSession*()  → ${profile.hook_mechanism}
+ */`;
+
+  // Class definition
+  const classDecl = `export class ${className}Adapter implements ExecutionRuntime {
+  readonly harness = "${harnessKey}";
+
+  agents: AgentSpawner = {
+    spawn: async (params: SpawnAgentParams): Promise<AgentHandle> => {
+      // ${profile.name}: ${profile.agent_spawn}({ agent_type: params.agentType, model: params.model, ... })
+      // Execution is LLM-mediated — this method documents the expected call shape.
+      return {
+        workerId: params.workerId ?? -1,
+        status: "pending",
+        cancel: async () => { /* Cancel not supported in ${profile.name} */ },
+        getResult: async (): Promise<WorkerResult> => ({
+          status: "completed",
+          summary: "Agent execution is LLM-mediated via ${profile.agent_spawn}().",
+        }),
+      };
+    },
+  };
+
+  skills: SkillInvoker = {
+    invoke: async (params: InvokeSkillParams): Promise<SkillResult> => {
+      // ${profile.name}: ${profile.skill_invoke}({ skill: params.skillName })
+      return {
+        skillName: params.skillName,
+        output: "Skill invocation is LLM-mediated via ${profile.skill_invoke}().",
+      };
+    },
+  };
+
+  commands: CommandRunner = {
+    exec: async (_params: ExecCommandParams): Promise<CommandResult> => {
+      return { stdout: "", stderr: "", exitCode: 0 };
+    },
+  };
+
+  lifecycle: LifecycleManager = {
+    onSessionStart: (_handler) => { ${lifecycleComment(profile.hook_mechanism, profile.hook_events, 0)} },
+    onSessionEnd: (_handler) => { ${lifecycleComment(profile.hook_mechanism, profile.hook_events, 1)} },
+    onPreToolUse: (_handler) => { ${lifecycleComment(profile.hook_mechanism, profile.hook_events, 2)} },
+    onPostToolUse: (_handler) => { ${lifecycleComment(profile.hook_mechanism, profile.hook_events, 3)} },
+    onUserPromptSubmit: (_handler) => { ${lifecycleComment(profile.hook_mechanism, profile.hook_events, 4)} },
+  };
+}`;
+
+  // Singleton export
+  const singleton = `/** Singleton instance. Replace with harness-native instantiation if needed. */
+export const runtime: ExecutionRuntime = new ${className}Adapter();`;
+
+  return `${imports}\n\n${summary}\n\n${header}\n\n${classDecl}\n\n${singleton}\n`;
+}
+
+// ── Instruction Block Generation ────────────────────────────────────────────
+
+/**
+ * Return the agent type parameter name for a given harness.
+ * Claude Code uses `subagent_type`; all others use `agent_type`.
+ */
+function agentParamName(harnessKey: string): string {
+  return harnessKey === "claude-code" ? "subagent_type" : "agent_type";
+}
+
+/**
+ * Generate the comprehensive PMM delegation block to append to a harness instruction file.
+ *
+ * The block tells the harness LLM how to delegate PMM operations using
+ * the harness's native primitives. Covers auto-activation, delegation philosophy,
+ * PMM-first awareness, agent spawning protocol, skill invocation, and verification.
+ *
+ * @param profile     Full harness profile from the registry
+ * @param harnessKey  The registry key for this harness (derived from adapter_file if omitted)
+ */
+export function generateInstructionBlock(
+  profile: HarnessProfile,
+  harnessKey: string = getKeyFromProfile(profile),
+): string {
+  const today = new Date().toISOString().split("T")[0];
+  const adapterPath = `src/pmm/execution/${profile.adapter_file}`;
+  const apn = agentParamName(harnessKey);
+  const A = profile.agent_spawn;
+  const S = profile.skill_invoke;
+  const C = profile.command_run;
+
+  const lines = [
+    "",
+    "",
+    `<!-- PMM Execution Framework — Auto-generated delegation rules -->`,
+    `<!-- Generated: ${today} | Adapter: ${adapterPath} -->`,
+    `<!-- Harness profile: src/pmm/execution/harnesses/registry.json → ${harnessKey} -->`,
+    "",
+    "## PMM Platform Integration",
+    "",
+    `This project is managed by the **PMM Platform** — a multi-agent orchestration system for portfolio health, planning, standards compliance, drift detection, and session continuity. You are a **CONDUCTOR**, not a performer. Delegate PMM operations through the execution contract.`,
+    "",
+    "### PMM — AUTO-ACTIVATE (HARD RULE)",
+    "",
+    "**On EVERY session start, your FIRST action after reading this file MUST be to spawn the pmm-agent as a background task.**",
+    "",
+    "The pmm-agent runs the full SessionStart protocol autonomously — session registration, project detection, health scoring, drift scan, and standards check. It returns a structured report. You do NOT run protocol steps inline.",
+    "",
+    "**How to activate:**",
+    "```",
+    `1. Spawn pmm-agent:`,
+    `   ${A}(${apn}="pmm-agent", model="sonnet",`,
+    `         description="SessionStart protocol",`,
+    `         prompt="Read .claude/agents/pmm.md. Execute the full SessionStart protocol`,
+    `               (steps 0-6). Return a structured report with session ID, project,`,
+    `               health, drift, and standards status.",`,
+    `         run_in_background=true)`,
+    "",
+    "2. When the agent returns, present its summary in 1-2 lines.",
+    "   Do NOT re-execute any of its steps.",
+    "",
+    `3. If the report includes ${A}() calls (e.g., for health-scorer), spawn them.`,
+    "```",
+    "",
+    "### DELEGATION-FIRST PHILOSOPHY",
+    "",
+    "```",
+    "RULE 1: ALWAYS delegate substantive work to specialized agents",
+    "RULE 2: ALWAYS invoke appropriate PMM skills for recognized patterns",
+    "RULE 3: NEVER do code changes directly for PMM-managed concerns",
+    "RULE 4: NEVER complete work without verification",
+    "RULE 5: ALWAYS query PMM before exploring known-project code",
+    "```",
+    "",
+    "### PMM-First Project Awareness (CRITICAL)",
+    "",
+    "**Before exploring, searching, or reading files for a known project, query PMM first.**",
+    "",
+    "PMM is the system of record for project state:",
+    "```",
+    `${C}("bun scripts/pmm.ts project get <name>")       → phase, stack, health, tools, path`,
+    `${C}("bun scripts/pmm.ts milestone list <name>")    → what's planned`,
+    `${C}("bun scripts/pmm.ts feature list <name>")      → what's being built`,
+    "```",
+    "",
+    "Then check for existing architecture docs:",
+    "- `PMM/<name>/project.md`",
+    "- `docs/superpowers/specs/*<name>*`",
+    "",
+    "### Execution Contract",
+    "",
+    `All PMM operations go through the **Execution Contract** (\`src/pmm/execution/contract.ts\`):`,
+    "",
+    `| Contract Method | ${profile.name} Primitive | Description |`,
+    "|----------------|--------------------------|-------------|",
+    `| \`runtime.agents.spawn()\` | \`${A}()\` | Spawn a subagent with worker tracking |`,
+    `| \`runtime.skills.invoke()\` | \`${S}()\` | Load and execute a PMM skill |`,
+    `| \`runtime.commands.exec()\` | \`${C}()\` | Run a shell command |`,
+    `| \`runtime.lifecycle.on*()\` | \`${profile.config_file}\` hooks | Register lifecycle handlers |`,
+    "",
+    "### Agent Spawning Protocol",
+    "",
+    `Before spawning any agent via \`${A}()\`, follow this protocol:`,
+    "",
+    "```",
+    "1. Check registration config:",
+    `   ${C}("bun scripts/pmm.ts config get agent_registration")`,
+    "",
+    "2. Dispatch worker (if registration policy requires it):",
+    `   WORKER_ID=$(bun scripts/pmm.ts worker dispatch <agent-type> <model> "<task>" --project <name>)`,
+    "",
+    "3. Include in the agent prompt:",
+    '   "YOUR PMM WORKER ID IS #${WORKER_ID}.',
+    "    Run 'bun scripts/pmm.ts worker update ${WORKER_ID} --status running --started'.",
+    '    On completion run \'bun scripts/pmm.ts worker update ${WORKER_ID} --status completed --result \\"...\\"\'."',
+    "",
+    "4. Spawn the agent:",
+    `   ${A}(${apn}="<agent-type>", model="<model>", prompt="...")`,
+    "```",
+    "",
+    "### Agent Selection Guide",
+    "",
+    "| Task Type | Agent | Model |",
+    "|-----------|-------|-------|",
+    "| Simple code change | executor-low | haiku |",
+    "| Feature implementation | executor | sonnet |",
+    "| Complex refactoring | executor-high | opus |",
+    "| Debug simple issue | architect-low | haiku |",
+    "| Debug complex issue | architect | opus |",
+    "| UI component | designer | sonnet |",
+    "| Write docs | writer | haiku |",
+    "| Research docs/APIs | researcher | sonnet |",
+    "| Strategic planning | planner | opus |",
+    "| Review/critique plan | critic | opus |",
+    "| Security review | security-reviewer | opus |",
+    "| Code review | code-reviewer | opus |",
+    "| TDD workflow | tdd-guide | sonnet |",
+    "| Quick code lookup | explore | haiku |",
+    "| Complex architectural search | explore-high | opus |",
+    "",
+    "### PMM Skill Invocation",
+    "",
+    "| When User Says... | Invoke Skill |",
+    "|-------------------|-------------|",
+    `| "health check", "how are projects" | \`${S}(skill="pmm-health")\` |`,
+    `| "plan this", "architect", "milestones" | \`${S}(skill="pmm-plan")\` |`,
+    `| "onboard", "register project", "discover" | \`${S}(skill="pmm-onboard")\` |`,
+    `| "drift", "out of sync", "unregistered" | \`${S}(skill="pmm-drift")\` |`,
+    `| "standards check", "compliance" | \`${S}(skill="pmm-standards")\` |`,
+    `| "dispatch", "worker", "delegate to" | \`${S}(skill="pmm-worker")\` |`,
+    `| "capture session", "handoff" | \`${S}(skill="pmm-capture")\` |`,
+    `| "pmm check", "pmm scan" | \`${S}(skill="pmm-agent")\` |`,
+    "",
+    "### Background PMM Commands",
+    "",
+    "```",
+    `${C}("bun scripts/pmm.ts health")              → Full portfolio health report`,
+    `${C}("bun scripts/pmm.ts summary")             → Portfolio summary`,
+    `${C}("bun scripts/pmm.ts project list")        → All registered projects`,
+    `${C}("bun scripts/pmm.ts config get <key>")    → Read PMM configuration`,
+    `${C}("bun scripts/pmm.ts worker list")         → Active agent workers`,
+    `${C}("bun scripts/pmm.ts worker trace <id>")   → Trace worker execution`,
+    "```",
+    "",
+    "### Verification-Before-Completion",
+    "",
+    "**Iron Law:** NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE",
+    "",
+    'Before any agent says "done", "fixed", or "complete":',
+    "1. IDENTIFY the verification command",
+    "2. RUN the command",
+    "3. READ the output — did it pass?",
+    "4. CLAIM completion WITH evidence",
+    "",
+    "### Smart Model Routing",
+    "",
+    `Always pass \`model\` parameter explicitly when spawning agents:`,
+    '- Simple lookup → `model="haiku"`',
+    '- Standard work → `model="sonnet"`',
+    '- Complex reasoning → `model="opus"`',
+    "",
+    "---",
+    "",
+    "**Execution contract reference:** `src/pmm/execution/contract.ts`",
+    `**Harness profile:** \`src/pmm/execution/harnesses/registry.json → ${harnessKey}\``,
+    `**Adapter:** \`${adapterPath}\``,
+    "",
+  ];
+
+  return lines.join("\n");
+}
+
+// ── File Injection ──────────────────────────────────────────────────────────
+
+/**
+ * Given a harness profile, writes the generated adapter and optionally
+ * augments the harness instruction file with PMM delegation rules.
+ *
+ * @param profile  Full harness profile from the registry
+ * @param options  dryRun — skip file writes; outputDir — base dir for instruction file
+ * @returns InjectResult with paths and file write log
+ */
+export function injectHarness(
+  profile: HarnessProfile,
+  options?: { dryRun?: boolean; outputDir?: string },
+): InjectResult {
+  const harnessKey = getKeyFromProfile(profile);
+  const adapterPath = `src/pmm/execution/adapters/${harnessKey}.ts`;
+  const filesWritten: string[] = [];
+
+  if (!options?.dryRun) {
+    // Write adapter file
+    const adapterContent = generateAdapter(profile, harnessKey);
+    fs.mkdirSync(path.dirname(adapterPath), { recursive: true });
+    fs.writeFileSync(adapterPath, adapterContent, "utf-8");
+    filesWritten.push(adapterPath);
+  }
+
+  // Augment instruction file if outputDir is provided
+  let instructionPath: string | null = null;
+  if (options?.outputDir) {
+    const instructionFullPath = path.join(options.outputDir, profile.instruction_file);
+    instructionPath = instructionFullPath;
+
+    if (fs.existsSync(instructionFullPath)) {
+      if (!options?.dryRun) {
+        const instructionBlock = generateInstructionBlock(profile, harnessKey);
+        fs.appendFileSync(instructionFullPath, instructionBlock, "utf-8");
+        filesWritten.push(instructionFullPath);
+      }
+    } else {
+      instructionPath = null;
+    }
+  }
+
+  return {
+    adapterPath,
+    instructionPath,
+    dryRun: options?.dryRun ?? false,
+    filesWritten,
+  };
+}
+
+// ── Internal Helpers ────────────────────────────────────────────────────────
+
+/**
+ * Derive the harness key from the profile's adapter_file.
+ * e.g., "adapters/opencode.ts" → "opencode"
+ */
+function getKeyFromProfile(profile: HarnessProfile): string {
+  return path.basename(profile.adapter_file, ".ts");
+}

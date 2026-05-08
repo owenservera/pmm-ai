@@ -1,0 +1,77 @@
+{
+  "description": "PMM Execution Framework — Harness Profiles. Each profile maps the execution contract to harness-native primitives.",
+  "harnesses": {
+    "claude-code": {
+      "name": "Claude Code",
+      "instruction_file": "CLAUDE.md",
+      "config_file": ".claude/settings.local.json",
+      "agent_spawn": "Task",
+      "skill_invoke": "Skill",
+      "command_run": "Bash",
+      "file_read": "Read",
+      "file_write": "Write",
+      "hook_mechanism": "settings.local.json hooks array",
+      "hook_events": ["SessionStart", "Stop", "PreToolUse", "PostToolUse", "UserPromptSubmit"],
+      "adapter_file": "adapters/claude-code.ts",
+      "status": "active"
+    },
+    "opencode": {
+      "name": "opencode-ai",
+      "instruction_file": "CLAUDE.md",
+      "config_file": "",
+      "agent_spawn": "Task",
+      "skill_invoke": "Skill",
+      "command_run": "Bash",
+      "file_read": "Read",
+      "file_write": "Write",
+      "hook_mechanism": "",
+      "hook_events": [],
+      "adapter_file": "adapters/opencode.ts",
+      "status": "planned"
+    },
+    "kilocode": {
+      "name": "KiloCode CLI",
+      "instruction_file": "AGENTS.md",
+      "config_file": "kilocode.json",
+      "agent_spawn": "agent",
+      "skill_invoke": "skill",
+      "command_run": "terminal",
+      "file_read": "read",
+      "file_write": "write",
+      "hook_mechanism": "kilocode.json hooks",
+      "hook_events": ["sessionStart", "sessionEnd", "preToolUse", "postToolUse"],
+      "adapter_file": "adapters/kilocode.ts",
+      "status": "planned"
+    },
+    "gemini-cli": {
+      "name": "Gemini CLI",
+      "instruction_file": "GEMINI.md",
+      "config_file": ".gemini/config.json",
+      "agent_spawn": "activate_skill",
+      "skill_invoke": "activate_skill",
+      "command_run": "shell",
+      "file_read": "file_read",
+      "file_write": "file_write",
+      "hook_mechanism": ".gemini/config.json triggers",
+      "hook_events": ["onSessionStart", "onSessionEnd", "onUserPrompt"],
+      "adapter_file": "adapters/gemini.ts",
+      "status": "planned",
+      "notes": "Gemini CLI has no separate skill concept — skills ARE agents. Both spawn and invoke map to activate_skill."
+    },
+    "antigravity": {
+      "name": "Antigravity IDE",
+      "instruction_file": ".antigravity/instructions.md",
+      "config_file": ".antigravity/config.json",
+      "agent_spawn": "task",
+      "skill_invoke": "skill",
+      "command_run": "terminal",
+      "file_read": "read_file",
+      "file_write": "write_file",
+      "hook_mechanism": ".antigravity/config.json events",
+      "hook_events": ["onOpen", "onClose", "onEdit", "onPrompt"],
+      "adapter_file": "adapters/antigravity.ts",
+      "status": "planned",
+      "notes": "IDE-native: persistent execution model, no session start/end in the CLI sense. Hooks map to workspace events."
+    }
+  }
+}

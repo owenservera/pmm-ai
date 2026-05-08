@@ -1,0 +1,421 @@
+[
+  {
+    "id": "health-check",
+    "name": "Portfolio Health Check",
+    "description": "Run a comprehensive health check across all registered PMM projects, scoring their status and identifying issues.",
+    "trigger_keywords": [
+      "health check",
+      "how are projects",
+      "portfolio status",
+      "anything broken",
+      "project health",
+      "how are we doing",
+      "status check",
+      "are projects healthy",
+      "what's the status",
+      "health report",
+      "check health"
+    ],
+    "soft_patterns": [
+      "health project",
+      "check status",
+      "portfolio health",
+      "project status",
+      "anything wrong",
+      "how look",
+      "what state"
+    ],
+    "context_boosts": {
+      "phase_match": [],
+      "recency_decay_sec": 300,
+      "required_state": {}
+    },
+    "target_workstream": {
+      "steps": [
+        {
+          "skill": "pmm-health",
+          "run_mode": "sequential"
+        }
+      ]
+    },
+    "priority": 90,
+    "conflicts": ["drift-scan"],
+    "threshold_override": null
+  },
+  {
+    "id": "drift-scan",
+    "name": "Configuration Drift Detection",
+    "description": "Detect configuration drift between PMM state and actual project filesystem, registration, and agent state.",
+    "trigger_keywords": [
+      "drift",
+      "out of sync",
+      "unregistered",
+      "what's missing",
+      "config mismatch",
+      "detect drift",
+      "find gaps",
+      "sync check",
+      "what needs registering",
+      "unregistered agents"
+    ],
+    "soft_patterns": [
+      "find missing",
+      "sync status",
+      "config drift",
+      "registration gap",
+      "not registered",
+      "need register",
+      "database reality"
+    ],
+    "context_boosts": {
+      "phase_match": [],
+      "recency_decay_sec": 300,
+      "required_state": {}
+    },
+    "target_workstream": {
+      "steps": [
+        {
+          "skill": "pmm-drift",
+          "run_mode": "sequential"
+        }
+      ]
+    },
+    "priority": 80,
+    "conflicts": ["health-check"],
+    "threshold_override": null
+  },
+  {
+    "id": "project-planning",
+    "name": "Project Planning & Architecture",
+    "description": "Interactive project planning session covering milestones, features, roadblocks, decisions, and architecture.",
+    "trigger_keywords": [
+      "plan this",
+      "create milestones",
+      "architect",
+      "break down",
+      "generate plan",
+      "spec out",
+      "design doc",
+      "requirements",
+      "create plan",
+      "project plan",
+      "feature breakdown",
+      "milestone planning",
+      "architecture review",
+      "structural audit"
+    ],
+    "soft_patterns": [
+      "plan project",
+      "create plan",
+      "generate milestone",
+      "need architecture",
+      "design document",
+      "spec write",
+      "what feature",
+      "break task"
+    ],
+    "context_boosts": {
+      "phase_match": ["discover", "define", "design"],
+      "recency_decay_sec": 600,
+      "required_state": {}
+    },
+    "target_workstream": {
+      "steps": [
+        {
+          "skill": "pmm-plan",
+          "agent": "pmm-planner",
+          "model": "sonnet",
+          "run_mode": "sequential"
+        }
+      ]
+    },
+    "priority": 85,
+    "conflicts": ["project-onboarding"],
+    "threshold_override": null
+  },
+  {
+    "id": "project-onboarding",
+    "name": "Project Onboarding",
+    "description": "Register a new project into PMM, detecting stack, phase, tools, and creating initial state.",
+    "trigger_keywords": [
+      "onboard",
+      "register project",
+      "discover",
+      "add to pmm",
+      "new project",
+      "scan directory",
+      "onboard project",
+      "register repo",
+      "add project"
+    ],
+    "soft_patterns": [
+      "new project",
+      "register new",
+      "discover project",
+      "add codebase",
+      "scan for",
+      "onboard repo",
+      "track this"
+    ],
+    "context_boosts": {
+      "phase_match": [],
+      "recency_decay_sec": 600,
+      "required_state": {}
+    },
+    "target_workstream": {
+      "steps": [
+        {
+          "skill": "pmm-onboard",
+          "run_mode": "sequential"
+        }
+      ]
+    },
+    "priority": 75,
+    "conflicts": ["project-planning"],
+    "threshold_override": null
+  },
+  {
+    "id": "session-capture",
+    "name": "Session Capture & Continuity",
+    "description": "Capture the current session state and create a continuity handoff for future sessions.",
+    "trigger_keywords": [
+      "pmm capture",
+      "register session",
+      "capture session",
+      "save session",
+      "handoff",
+      "save state",
+      "create handoff",
+      "context save"
+    ],
+    "soft_patterns": [
+      "session save",
+      "capture progress",
+      "save context",
+      "handoff session",
+      "preserve state",
+      "remember progress"
+    ],
+    "context_boosts": {
+      "phase_match": [],
+      "recency_decay_sec": 120,
+      "required_state": {}
+    },
+    "target_workstream": {
+      "steps": [
+        {
+          "skill": "pmm-capture",
+          "agent": "pmm-capturer",
+          "model": "sonnet",
+          "run_mode": "sequential"
+        }
+      ]
+    },
+    "priority": 70,
+    "conflicts": [],
+    "threshold_override": null
+  },
+  {
+    "id": "standards-check",
+    "name": "Standards Compliance Check",
+    "description": "Check project files against PMM standards for structure, naming, and agent registration conventions.",
+    "trigger_keywords": [
+      "standards check",
+      "compliance",
+      "are we following",
+      "best practices",
+      "standards report",
+      "check standards",
+      "standards compliance",
+      "convention check",
+      "follow guidelines"
+    ],
+    "soft_patterns": [
+      "check standard",
+      "compliance report",
+      "standard follow",
+      "convention project",
+      "best practice",
+      "guideline compliance"
+    ],
+    "context_boosts": {
+      "phase_match": [],
+      "recency_decay_sec": 600,
+      "required_state": {}
+    },
+    "target_workstream": {
+      "steps": [
+        {
+          "skill": "pmm-standards",
+          "run_mode": "sequential"
+        }
+      ]
+    },
+    "priority": 65,
+    "conflicts": [],
+    "threshold_override": null
+  },
+  {
+    "id": "docs-standardization",
+    "name": "Documentation Standardization",
+    "description": "Standardize project documentation including AGENTS.md, README, and other project docs.",
+    "trigger_keywords": [
+      "docs standard",
+      "standardize docs",
+      "generate AGENTS.md",
+      "fix docs",
+      "clean docs",
+      "master clean",
+      "docs check",
+      "documentation standard",
+      "create AGENTS.md"
+    ],
+    "soft_patterns": [
+      "documentation project",
+      "standard doc",
+      "agent instruction",
+      "generate doc",
+      "project documentation",
+      "readme standard"
+    ],
+    "context_boosts": {
+      "phase_match": [],
+      "recency_decay_sec": 600,
+      "required_state": {}
+    },
+    "target_workstream": {
+      "steps": [
+        {
+          "skill": "pmm-docs-standard",
+          "run_mode": "sequential"
+        }
+      ]
+    },
+    "priority": 60,
+    "conflicts": [],
+    "threshold_override": null
+  },
+  {
+    "id": "architecture-analysis",
+    "name": "Architecture Analysis & Refactoring",
+    "description": "Deep analysis of project architecture, coupling, structure, and generation of refactoring plans.",
+    "trigger_keywords": [
+      "review architecture",
+      "structural audit",
+      "architecture analysis",
+      "refactoring plan",
+      "coupling analysis",
+      "code structure",
+      "architecture review",
+      "restructure"
+    ],
+    "soft_patterns": [
+      "architecture project",
+      "structural review",
+      "code structure",
+      "coupling check",
+      "refactor plan",
+      "directory structure"
+    ],
+    "context_boosts": {
+      "phase_match": ["build", "maintain"],
+      "recency_decay_sec": 1800,
+      "required_state": {}
+    },
+    "target_workstream": {
+      "steps": [
+        {
+          "skill": "pmm-architect",
+          "agent": "pmm-architect",
+          "model": "sonnet",
+          "run_mode": "sequential"
+        }
+      ]
+    },
+    "priority": 55,
+    "conflicts": ["project-planning"],
+    "threshold_override": null
+  },
+  {
+    "id": "pmm-full-check",
+    "name": "Full PMM System Check",
+    "description": "Run a comprehensive PMM system check combining health, drift, and standards checks in sequence.",
+    "trigger_keywords": [
+      "pmm check",
+      "pmm scan",
+      "pmm fix",
+      "pmm register",
+      "run pmm",
+      "pmm full",
+      "full check"
+    ],
+    "soft_patterns": [
+      "everything check",
+      "full scan",
+      "complete check",
+      "all problem",
+      "system check",
+      "pmm run"
+    ],
+    "context_boosts": {
+      "phase_match": [],
+      "recency_decay_sec": 300,
+      "required_state": {}
+    },
+    "target_workstream": {
+      "steps": [
+        {
+          "skill": "pmm-health",
+          "run_mode": "sequential"
+        },
+        {
+          "skill": "pmm-drift",
+          "run_mode": "sequential"
+        },
+        {
+          "skill": "pmm-standards",
+          "run_mode": "sequential"
+        }
+      ]
+    },
+    "priority": 95,
+    "conflicts": ["health-check", "drift-scan", "standards-check"],
+    "threshold_override": null
+  },
+  {
+    "id": "agent-delegation",
+    "name": "Agent Worker Dispatch",
+    "description": "Dispatch and manage agent worker lifecycle including registration, task assignment, and completion.",
+    "trigger_keywords": [
+      "dispatch",
+      "spawn agent",
+      "delegate",
+      "worker",
+      "send agent",
+      "run agent"
+    ],
+    "soft_patterns": [
+      "dispatch agent",
+      "spawn worker",
+      "delegate task",
+      "worker protocol",
+      "agent lifecycle"
+    ],
+    "context_boosts": {
+      "phase_match": [],
+      "recency_decay_sec": 60,
+      "required_state": {}
+    },
+    "target_workstream": {
+      "steps": [
+        {
+          "skill": "pmm-worker",
+          "run_mode": "sequential"
+        }
+      ]
+    },
+    "priority": 50,
+    "conflicts": [],
+    "threshold_override": null
+  }
+]
