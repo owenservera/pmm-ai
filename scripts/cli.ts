@@ -59,6 +59,9 @@ const MODULE_MAP: Record<string, string> = {
   status:        "../src/commands/status",
   resume:        "../src/commands/status",
   mvp:           "../src/commands/mvp-scope",
+  debate:        "../src/commands/debate",
+  build:         "../src/commands/autonomous-build",
+  watch:         "../src/commands/health-monitor",
   tooling:       "../src/commands/tooling-cmds",
 };
 
