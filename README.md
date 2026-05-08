@@ -233,11 +233,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). PRs welcome. Check `pmm-ai tooling all` 
 
 ## License
 
-MIT © [VIVIM](https://vivim.io)
+MIT © [VIVIM](https://vivim.live)
 
 ---
 
 <p align="center">
-  <sub>Built with ❤️ by <a href="https://vivim.io">VIVIM</a></sub><br>
+  <sub>Built with ❤️ by <a href="https://vivim.live">VIVIM</a></sub><br>
   <sub>Part of the PMM ecosystem — <i>Project Memory that outlives the session</i></sub>
 </p>

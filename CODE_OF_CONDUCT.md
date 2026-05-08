@@ -28,7 +28,7 @@ Examples of unacceptable behavior:
 
 Community leaders are responsible for clarifying and enforcing our standards of acceptable behavior and will take appropriate and fair corrective action in response to any behavior that they deem inappropriate, threatening, offensive, or harmful.
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at [opensource@vivim.io]. All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at [opensource@vivim.live]. All complaints will be reviewed and investigated promptly and fairly.
 
 ## Attribution
 
