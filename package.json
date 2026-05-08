@@ -1,6 +1,6 @@
 {
   "name": "pmm-ai",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Autonomous AI development platform — project memory, agent orchestration, and quality gates for any AI harness",
   "type": "module",
   "license": "MIT",
