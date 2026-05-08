@@ -20,6 +20,7 @@ import { join, resolve, dirname } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
+import { getDbPath } from "../src/db";
 
 const ROOT = resolve(import.meta.dir, "..");
 const CWD = process.cwd();
@@ -28,6 +29,9 @@ const ARGS = process.argv.slice(2);
 const CMD = ARGS[0];
 const FLAGS = new Set(ARGS.filter(a => a.startsWith("--")));
 const IS_INTERACTIVE = process.stdout.isTTY && !FLAGS.has("--no-interactive");
+
+// Resolve DB path (respects PMM_DB_PATH env var, defaults to ~/.pmm-ai/data/pmm.db)
+const PMM_DB = getDbPath();
 
 // ─── Interactive Prompts ───────────────────────────────────────────────
 
@@ -152,10 +156,8 @@ function buildHarnessProfile(name: string, cwd: string, isGlobal: boolean, cliPr
 
 // ─── First-Run Detection ────────────────────────────────────────────────
 
-const PPP_DB = join(HOME, ".pmm-ai", "data", "pmm.db");
-
 function isFirstRun(): boolean {
-  return !existsSync(PPP_DB);
+  return !existsSync(PMM_DB);
 }
 
 // ─── Skill Definitions ─────────────────────────────────────────────────
@@ -272,7 +274,7 @@ async function firstRunWizard(): Promise<WizardConfig> {
   console.log("  \x1b[34m═══ Configuration Summary ═══\x1b[0m");
   console.log(`  Harness:       \x1b[32m${harnessName}\x1b[0m`);
   console.log(`  Install scope: \x1b[32m${scope}\x1b[0m`);
-  console.log(`  DB location:   \x1b[2m${PPP_DB}\x1b[0m`);
+  console.log(`  DB location:   \x1b[2m${PMM_DB}\x1b[0m`);
   console.log("");
 
   const go = await confirm("Proceed with setup?", true);
@@ -503,7 +505,7 @@ async function runSetup(harnessName: string, scope: InstallScope) {
   console.log("\x1b[32m  ╚══════════════════════════════════════╝\x1b[0m");
   console.log("");
   console.log(`  Skills:   \x1b[32m${skillsCount}\x1b[0m registered to ${done.join(" + ")}`);
-  console.log(`  Database: \x1b[2m${PPP_DB}\x1b[0m`);
+  console.log(`  Database: \x1b[2m${PMM_DB}\x1b[0m`);
   console.log("");
   console.log("  Next steps:");
   if (scope === "global" || scope === "both") {

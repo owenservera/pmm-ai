@@ -11,10 +11,20 @@ const { existsSync, mkdirSync } = require("node:fs");
 const { resolve, dirname, join } = require("node:path");
 const { homedir } = require("node:os");
 
-// Ensure PMM data directory exists before CLI touches the DB
-const PPP_DATA = join(homedir(), ".pmm-ai", "data");
-if (!existsSync(PPP_DATA)) {
-  try { mkdirSync(PPP_DATA, { recursive: true }); } catch {}
+// Resolve data directory (respects PMM_DB_PATH env var)
+let dataDir;
+const envDbPath = process.env.PMM_DB_PATH;
+if (envDbPath) {
+  // Extract the parent directory from the custom DB path
+  const resolved = envDbPath.startsWith("~")
+    ? join(homedir(), envDbPath.slice(1))
+    : envDbPath;
+  dataDir = require("node:path").dirname(resolved);
+} else {
+  dataDir = join(homedir(), ".pmm-ai", "data");
+}
+if (!existsSync(dataDir)) {
+  try { mkdirSync(dataDir, { recursive: true }); } catch {}
 }
 
 const args = process.argv.slice(2);
