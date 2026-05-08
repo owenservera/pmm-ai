@@ -58,6 +58,7 @@ const MODULE_MAP: Record<string, string> = {
   new:           "../src/commands/mvp-start",
   status:        "../src/commands/status",
   resume:        "../src/commands/status",
+  mvp:           "../src/commands/mvp-scope",
   tooling:       "../src/commands/tooling-cmds",
 };
 
