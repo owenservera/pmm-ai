@@ -28,50 +28,281 @@ Without PMM:  Search(pattern: "**/*") → expensive, unstructured, no memory
 With PMM:     pmm project get <name> → instant, structured, full history
 ```
 
+---
+
+## System Overview
+
+```mermaid
+flowchart TB
+    subgraph Harness["🤖 AI Harness"]
+        CC["Claude Code"]
+        OC["OpenCode"]
+        GC["Gemini CLI"]
+        KC["KiloCode"]
+        AG["Antigravity"]
+    end
+
+    subgraph PMM["⚡ PMM-AI Platform"]
+        direction TB
+        CLI["🔧 CLI Router\n43 commands"]
+        MCP["🔌 MCP Server\n19 tools"]
+        Hooks["🪝 Lifecycle Hooks\nSessionStart/Stop"]
+        Skills["🎯 12 Skills\nagent, plan, health, swarm..."]
+
+        subgraph Core["🧠 Core Engine"]
+            DB["🗄️ SQLite DB\n54 tables · WAL mode"]
+            Schema["📐 Schema\nProjects · Milestones\nFeatures · Decisions\nSwarm · Sessions"]
+            Auto["🔮 Auto-Derive\nNLP → plan + swarm config"]
+        end
+
+        subgraph Tooling["🛠️ Dev Toolchain"]
+            Lint["Self-Lint\n95 checks"]
+            Shake["Tree-Shake\nDead code"]
+            Tokens["Token Budget\nPer agent/model"]
+            Profile["Profiler\nLatency · bottlenecks"]
+            Cleanup["Cleanup\nOrphan detection"]
+            Deps["Dep Graph\nCross-project"]
+        end
+
+        subgraph Viz["📊 Visualization"]
+            Dashboard["Live Dashboard\nPortfolio · Health · Gantt"]
+            Server["HTTP :9998\nAuto-refresh 5s"]
+        end
+    end
+
+    subgraph Projects["📁 Your Projects"]
+        P1["Project A"]
+        P2["Project B"]
+        P3["Project C"]
+    end
+
+    Harness -->|"skills + hooks"| Skills
+    Harness -->|"stdio"| MCP
+    Harness -->|"JSON config"| Hooks
+    Skills --> CLI
+    MCP --> DB
+    Hooks --> CLI
+    CLI --> Core
+    Core --> Tooling
+    Core --> Viz
+    Core -->|"registers & tracks"| Projects
+
+    style PMM fill:#1a1a2e,stroke:#6c63ff,color:#fff
+    style Core fill:#16213e,stroke:#0f3460,color:#fff
+    style Tooling fill:#16213e,stroke:#e94560,color:#fff
+    style Viz fill:#16213e,stroke:#00b894,color:#fff
+```
+
+---
+
 ## Quick Start
 
-```bash
-bunx pmm-ai setup
-```
+### Interactive First-Run Wizard
 
-That's it. Detects your AI tool (Claude Code, OpenCode, Gemini CLI, KiloCode, Antigravity), writes skills, configures MCP, sets up hooks, and registers your project.
+On a fresh machine, just run:
 
 ```bash
-bunx pmm-ai               # Portfolio dashboard + live server
-bunx pmm-ai start new      # "What are you building?" → auto-plan → swarm config
-bunx pmm-ai health         # Portfolio health check
-bunx pmm-ai tooling all    # Full platform scan (6 dev tools)
+bunx pmm-ai
 ```
 
-### For Vibe Coders
+No DB detected? PMM-AI launches an interactive wizard:
 
 ```
-> bunx pmm-ai start new
+╔══════════════════════════════════════════╗
+║   Welcome to PMM-AI!                     ║
+║   Autonomous Development Platform        ║
+╚══════════════════════════════════════════╝
 
-  What are you building?
-> a workout tracking app with social features
+  Let's get you set up. I'll ask a few questions.
 
-  Full-stack web app | TypeScript | React | Complexity: medium
-  Est. 8 milestones, ≤16 features
-  3 agent layers auto-configured
+  Detected claude-code. Use this? [Y/n]
 
-  Create this project? [Y/n]
+  Where should PMM-AI skills and hooks be installed?
+   > [1] Local only — ./.claude/skills/ (for this project)
+     [2] Global only — ~/.claude/skills/ (all projects)
+     [3] Both — local + global (recommended)
+  Pick [3]
+
+  ═══ Configuration Summary ═══
+  Harness:       claude-code
+  Install scope: both
+  DB location:   ~/.pmm-ai/data/pmm.db
+
+  Proceed with setup? [Y/n]
 ```
 
-Describe your app in plain English. PMM-AI auto-detects the stack, generates milestones, configures agent layers, and shows you a live dashboard. **No flags. No config. No jargon.**
+```mermaid
+flowchart LR
+    A["bunx pmm-ai"] --> B{DB exists?}
+    B -->|"no"| C["🔮 First-Run Wizard"]
+    B -->|"yes"| D["📊 Portfolio Dashboard"]
+    C --> E{Harness?}
+    E -->|"auto-detect"| F["✅ Confirm"]
+    E -->|"manual"| G["🎯 Select from 5"]
+    F --> H{Scope?}
+    G --> H
+    H -->|"local"| I["📁 ./.claude/skills/"]
+    H -->|"global"| J["🏠 ~/.claude/skills/"]
+    H -->|"both"| K["📁 + 🏠 Both"]
+    I --> L["⚡ Setup Complete"]
+    J --> L
+    K --> L
+    L --> D
+```
 
-### For Power Users
-
-Full CLI with 43 commands, MCP server with 19 tools, and 6 built-in dev tools:
+### Setup Flags (Power Users)
 
 ```bash
-pmm-ai tooling lint        # 95 self-checks across skills, agents, MCP, hooks
-pmm-ai tooling tree-shake  # Dead code, orphan skills, unused MCP tools
-pmm-ai tooling tokens      # Token budget per agent/model/project
-pmm-ai tooling profile     # Agent latency, stuck workers, bottlenecks
-pmm-ai tooling cleanup --fix  # Orphan detection + auto-clean
-pmm-ai tooling deps        # Cross-project dependency graph
+bunx pmm-ai setup               # Interactive (harness selection + scope)
+bunx pmm-ai setup --local       # Local only, auto-detect harness
+bunx pmm-ai setup --global      # Global only (~/.claude/skills/)
+bunx pmm-ai setup --both        # Both local + global
+bunx pmm-ai setup --local --no-interactive  # CI/CD friendly
 ```
+
+### Daily Use
+
+```bash
+bunx pmm-ai                    # Portfolio dashboard + live server
+bunx pmm-ai start new          # "What are you building?" → auto-plan → swarm config
+bunx pmm-ai health             # Portfolio health check
+bunx pmm-ai tooling all        # Full platform scan (6 dev tools)
+```
+
+---
+
+## Architecture
+
+### Deployment Topology
+
+```mermaid
+graph TB
+    subgraph UserMachine["🖥️ User Machine"]
+        subgraph Global["🏠 Global (~/.pmm-ai/)"]
+            GlobalDB["pmm.db\nAll projects"]
+            GlobalSkills["~/.claude/skills/\n12 PMM skills"]
+        end
+
+        subgraph ProjectA["📁 Project A"]
+            LocalSkillsA["./.claude/skills/\n12 PMM skills"]
+            LocalMCP[".mcp.json\nPMM server"]
+            LocalHooks[".claude/settings.local.json\nSessionStart/Stop hooks"]
+        end
+
+        subgraph ProjectB["📁 Project B"]
+            LocalSkillsB["./.claude/skills/\n12 PMM skills"]
+        end
+    end
+
+    GlobalSkills -.->|"global install"| GlobalDB
+    LocalSkillsA -->|"local install"| GlobalDB
+    LocalSkillsB -->|"local install"| GlobalDB
+    LocalMCP -->|"stdio"| GlobalDB
+    LocalHooks -->|"lifecycle"| GlobalDB
+
+    style Global fill:#1a1a2e,stroke:#6c63ff,color:#fff
+    style GlobalDB fill:#16213e,stroke:#f9ca24,stroke-width:3px,color:#fff
+```
+
+### Data Model (Core Tables)
+
+```mermaid
+erDiagram
+    PROJECTS ||--o{ MILESTONES : "has"
+    PROJECTS ||--o{ FEATURES : "has"
+    PROJECTS ||--o{ DECISIONS : "records"
+    PROJECTS ||--o{ ROADBLOCKS : "blocks"
+    PROJECTS ||--o{ TASKS : "tracks"
+    PROJECTS ||--o{ SESSIONS : "spans"
+    PROJECTS ||--o{ AGENT_LAYERS : "organizes"
+    AGENT_LAYERS ||--o{ SWARM_TASKS : "contains"
+    SESSIONS ||--o{ SESSION_CAPSULES : "captures"
+    TASKS ||--o{ TASK_NOTES : "documents"
+    PROJECTS ||--o{ EVALUATOR_GATES : "quality-checks"
+    AGENT_LAYERS ||--o{ AGENT_WORKERS : "dispatches"
+
+    PROJECTS {
+        int id PK
+        string name
+        string phase "discover|define|design|build|verify|deploy|maintain"
+        string stack
+        string health "healthy|attention|blocked"
+        string priority "critical|high|medium|low"
+        string path
+    }
+```
+
+### Setup Process Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant CLI as pmm-ai CLI
+    participant DB as SQLite DB
+    participant FS as File System
+
+    User->>CLI: bunx pmm-ai
+
+    alt First Run (no DB)
+        CLI->>CLI: Launch Wizard
+        CLI->>User: Welcome + harness selection
+        User->>CLI: Confirm harness
+        CLI->>User: Scope selection (local/global/both)
+        User->>CLI: Choose scope
+    else Returning User
+        CLI->>DB: Check existing projects
+        CLI->>User: Portfolio dashboard
+    end
+
+    CLI->>FS: Create ~/.pmm-ai/data/
+    CLI->>DB: Initialize schema (54 tables)
+    CLI->>FS: Write 12 skills → SKILL.md
+    CLI->>FS: Write MCP config → .mcp.json
+    CLI->>FS: Write hooks → settings.local.json
+    CLI->>DB: Register current project
+    CLI->>User: ✅ PMM-AI is ready!
+```
+
+### Agent Swarm Execution
+
+```mermaid
+flowchart LR
+    subgraph Orchestrator["🎯 Orchestrator"]
+        Plan["📋 Plan\nMilestones + Features"]
+        Dispatch["🚀 Dispatch\nSpawn agents"]
+    end
+
+    subgraph Layers["🐝 Agent Layers"]
+        L0["L0: Architect\nDesign & plan"]
+        L1["L1: Scaffold\nSetup & deps"]
+        L2["L2: Core Logic\nAlgorithms"]
+        L3["L3: Standards\nCompliance"]
+        L4["L4: Implement\nBuild features"]
+    end
+
+    subgraph Gates["🚦 Quality Gates"]
+        G1["TypeCheck"]
+        G2["Build"]
+        G3["Test"]
+        G4["Lint"]
+    end
+
+    Plan --> Dispatch
+    Dispatch --> L0
+    L0 -->|"design doc"| L1
+    L1 -->|"scaffold"| L2
+    L2 -->|"core"| L3
+    L3 -->|"standards"| L4
+    L4 -->|"implementation"| Gates
+    Gates -->|"pass"| Done["✅ Complete"]
+    Gates -->|"fail"| L4
+
+    style Orchestrator fill:#1a1a2e,stroke:#6c63ff,color:#fff
+    style Layers fill:#16213e,stroke:#00b894,color:#fff
+    style Gates fill:#16213e,stroke:#e94560,color:#fff
+```
+
+---
 
 ## Features
 
@@ -89,6 +320,7 @@ Every session captured. Every decision recorded. Every plan structured. Your age
 Auto-configured agent layers with RACI roles, parallel tracks, checkin/checkout task pools, and escalation paths. Describe your app → PMM-AI generates the plan and deploys the swarm.
 
 ### 🌐 Harness-Agnostic
+
 | Harness | Detected By | Skills | MCP | Hooks |
 |---------|------------|--------|-----|-------|
 | Claude Code | `.claude/settings.local.json` | 12 skills | 19 tools | SessionStart/Stop |
@@ -115,32 +347,40 @@ Traditional dev tools, reimagined for AI-assisted development:
 ### 🎯 Quality Gates
 Programmable evaluator gates with defined thresholds, watch mode, and agent-as-judge. Auto-run on session end. 4 consolidation health gates pre-configured.
 
-## Architecture
+---
+
+## Source Tree
 
 ```
 PMM-AI/
-├── bin/pmm.ts                  ← npm bin entry (bunx pmm-ai)
-├── scripts/cli.ts              ← 225-line CLI router (43 commands)
+├── bin/
+│   ├── pmm-ai.cjs               ← npm bin shim (Node CJS → bun)
+│   └── pmm.ts                   ← setup entry: wizard, harness detect, install
+├── scripts/
+│   └── cli.ts                   ← 225-line CLI router (43 commands)
 ├── src/
-│   ├── db.ts                   ← SQLite WAL — single-file DB, zero npm deps
-│   ├── schema.ts               ← DDL — tables, indexes, migrations
-│   ├── auto-derive.ts          ← NLP → project profile + swarm config
-│   ├── events.ts               ← Typed pub/sub event bus (in-process)
-│   ├── commands/               ← 10 modules: project, planning, swarm, health, mvp-start, mvp-wizard, tooling-cmds...
-│   ├── tooling/                ← 6 modules: tree-shake, self-lint, token-budget, profiler, cleanup, dep-graph
-│   ├── visualization/          ← Dashboard engine: data, generator, server
-│   ├── mcp/server.ts           ← MCP stdio server (19 tools)
-│   ├── execution/              ← Harness adapters, swarm deployment, planner
-│   └── process/                ← Environment scanner, artifact bridge
-├── data/                       ← SQLite DB (auto-created on first run)
-└── state/                      ← Self-referential session state
+│   ├── db.ts                    ← SQLite WAL — single-file DB, zero npm deps
+│   ├── schema.ts                ← DDL — 54 tables, indexes, migrations
+│   ├── auto-derive.ts           ← NLP → project profile + swarm config
+│   ├── events.ts                ← Typed pub/sub event bus (in-process)
+│   ├── commands/                ← 10 modules: project, planning, swarm, health...
+│   ├── tooling/                 ← 6 modules: tree-shake, self-lint, tokens...
+│   ├── visualization/           ← Dashboard: data → HTML generator → live server
+│   ├── mcp/server.ts            ← MCP stdio server (19 tools)
+│   ├── execution/               ← Harness adapters, swarm deployment, planner
+│   └── process/                 ← Environment scanner, artifact bridge
+├── state/                       ← Self-referential session state
+└── package.json                 ← v1.1.0 · zero dependencies
 ```
 
 **Key design properties:**
 - **Zero npm dependencies** — uses only Bun built-ins + Node stdlib
-- **Single-file DB** — `data/pmm.db` is the entire system of record
+- **Database at `~/.pmm-ai/data/pmm.db`** — survives npm cache clears, shared across projects
 - **Harness-agnostic** — MCP protocol works with any AI tool
+- **Interactive + scriptable** — wizard for humans, `--no-interactive` for CI/CD
 - **Rust-translatable** — every module exports `Record<string, (db, args) => Promise<void>>`
+
+---
 
 ## Commands
 
@@ -184,6 +424,8 @@ pmm-ai process scan
 pmm-ai mem sync
 ```
 
+---
+
 ## MCP Tools (19 total)
 
 Any MCP-compatible harness can call these directly:
@@ -215,6 +457,8 @@ Any MCP-compatible harness can call these directly:
 | `pmm_roadblock_add` | Blocker found |
 | `pmm_alert_create` | Alert condition |
 
+---
+
 ## Requirements
 
 - [Bun](https://bun.sh) >= 1.3.0
@@ -223,8 +467,16 @@ Any MCP-compatible harness can call these directly:
 ## Install / Uninstall
 
 ```bash
-bunx pmm-ai setup        # Full harness onboarding
-bunx pmm-ai unregister   # Remove skills, MCP, hooks (data preserved)
+# Interactive (recommended)
+bunx pmm-ai setup
+
+# Scripted / CI
+bunx pmm-ai setup --local --no-interactive
+bunx pmm-ai setup --global --no-interactive
+bunx pmm-ai setup --both --no-interactive
+
+# Remove
+bunx pmm-ai unregister    # Remove skills, MCP, hooks (data preserved)
 ```
 
 ## Contributing
