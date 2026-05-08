@@ -1,6 +1,6 @@
 {
   "name": "pmm-ai",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Autonomous AI development platform — project memory, agent orchestration, and quality gates for any AI harness",
   "type": "module",
   "license": "MIT",
@@ -10,13 +10,26 @@
   },
   "homepage": "https://github.com/owenservera/pmm-ai#readme",
   "keywords": [
-    "claude-code", "ai-agent", "project-management", "agent-orchestration",
-    "development-platform", "ai-harness", "mcp", "project-memory",
-    "portfolio", "code-quality", "self-audit", "vibe-coding",
-    "swarm", "multi-agent", "opencode", "gemini-cli", "kilocode"
+    "claude-code",
+    "ai-agent",
+    "project-management",
+    "agent-orchestration",
+    "development-platform",
+    "ai-harness",
+    "mcp",
+    "project-memory",
+    "portfolio",
+    "code-quality",
+    "self-audit",
+    "vibe-coding",
+    "swarm",
+    "multi-agent",
+    "opencode",
+    "gemini-cli",
+    "kilocode"
   ],
   "bin": {
-    "pmm-ai": "./bin/pmm-ai"
+    "pmm-ai": "bin/pmm-ai.cjs"
   },
   "files": [
     "bin/",
